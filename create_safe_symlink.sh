@@ -1,19 +1,17 @@
 #!/bin/bash
-set -euo pipefail  # 严格模式（macOS bash 3.2 兼容）
+set -euo pipefail  # 严格模式（兼容macOS/Linux）
 
 # ===================== 配置区 =====================
-LINK_TARGET_DIR="${HOME}"
-LOG_FILE="${HOME}/create_symlink_$(date +%Y%m%d%H%M%S).log"
+LINK_ROOT_DIR="${HOME}"  # 软链接根目录（家目录）
 BACKUP_SUFFIX=".bak_$(date +%Y%m%d%H%M%S)"
 # ===================== 函数定义区 =====================
 
-# 日志输出函数
+# 仅输出到标准输出
 log() {
     local LEVEL="$1"
     local MSG="$2"
-    # local TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
-    # echo -e "[$TIMESTAMP] [$LEVEL] $MSG" | tee -a "${LOG_FILE}"
-    echo -e "[$LEVEL] $MSG"
+    local TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+    echo -e "[$TIMESTAMP] [$LEVEL] $MSG"
 }
 
 # 校验参数
@@ -37,33 +35,41 @@ check_file_exists() {
     return 0
 }
 
-# 跨平台获取文件绝对路径（替换 Linux 的 realpath -e）
+# 跨平台获取文件绝对路径
 get_abs_path() {
     local FILE_PATH="$1"
-    # macOS 用 python 替代 realpath（macOS 自带 python3）
     if [[ "$(uname -s)" == "Darwin" ]]; then
         ABS_PATH=$(python3 -c "import os; print(os.path.realpath('${FILE_PATH}'))" 2>/dev/null)
     else
-        # Linux 保留 realpath
         ABS_PATH=$(realpath -e "${FILE_PATH}" 2>/dev/null)
     fi
     echo "${ABS_PATH}"
 }
 
-# 创建软链接核心逻辑
+# 创建软链接核心逻辑（保留路径层级）
 create_symlink() {
-    local SRC_FILE="$1"
-    local LINK_NAME="$2"
-    local LINK_PATH="${LINK_TARGET_DIR}/${LINK_NAME}"
+    local SRC_FILE="$1"          # 源文件绝对路径
+    local REL_PATH="$2"         # 传入的相对路径（如 .config/alacritty/alacritty.toml）
+    local LINK_PATH="${LINK_ROOT_DIR}/${REL_PATH}"  # 目标软链接完整路径
 
-    # 覆盖已存在的软链接
+    # 1. 创建目标目录（若不存在）
+    local LINK_DIR=$(dirname "${LINK_PATH}")
+    if [ ! -d "${LINK_DIR}" ]; then
+        log "INFO" "创建目标目录：${LINK_DIR}"
+        mkdir -p "${LINK_DIR}" || {
+            log "ERROR" "创建目录失败：${LINK_DIR}"
+            return 1
+        }
+    fi
+
+    # 2. 覆盖已存在的软链接
     if [ -L "${LINK_PATH}" ]; then
         log "INFO" "发现已存在的软链接，强制覆盖：${LINK_PATH}"
         ln -sf "${SRC_FILE}" "${LINK_PATH}"
         return 0
     fi
 
-    # 备份真实文件/目录
+    # 3. 备份真实文件/目录
     if [ -f "${LINK_PATH}" ] || [ -d "${LINK_PATH}" ]; then
         local BACKUP_PATH="${LINK_PATH}${BACKUP_SUFFIX}"
         log "WARNING" "目标是真实文件/目录，先备份：${LINK_PATH} → ${BACKUP_PATH}"
@@ -73,7 +79,7 @@ create_symlink() {
         }
     fi
 
-    # 创建软链接
+    # 4. 创建软链接
     ln -s "${SRC_FILE}" "${LINK_PATH}" || {
         log "ERROR" "创建软链接失败：${SRC_FILE} → ${LINK_PATH}"
         return 1
@@ -83,34 +89,28 @@ create_symlink() {
 }
 
 # ===================== 主程序 =====================
-# 初始化日志（macOS 权限兼容）
-#touch "${LOG_FILE}" && chmod 600 "${LOG_FILE}"
-#log "INFO" "脚本启动，日志文件：${LOG_FILE}"
+log "INFO" "脚本启动"
 
 # 校验参数
 check_params "$@"
 
 # 遍历文件参数
-for FILE in "$@"; do
-    # 跨平台获取绝对路径
-    ABS_SRC_FILE=$(get_abs_path "${FILE}")
+for REL_FILE in "$@"; do
+    # 步骤1：获取源文件绝对路径
+    ABS_SRC_FILE=$(get_abs_path "${REL_FILE}")
     if [ -z "${ABS_SRC_FILE}" ]; then
-        log "ERROR" "无法获取绝对路径：${FILE}"
+        log "ERROR" "无法获取绝对路径：${REL_FILE}"
         continue
     fi
 
-    # 校验文件合法性
+    # 步骤2：校验源文件合法性
     if ! check_file_exists "${ABS_SRC_FILE}"; then
         continue
     fi
 
-    # 提取文件名
-    FILE_NAME=$(basename "${ABS_SRC_FILE}")
-
-    # 创建软链接
-    create_symlink "${ABS_SRC_FILE}" "${FILE_NAME}"
+    # 步骤3：保留原始相对路径，创建软链接（核心修改）
+    create_symlink "${ABS_SRC_FILE}" "${REL_FILE}"
 done
 
-#log "INFO" "脚本执行完成，详见日志：${LOG_FILE}"
-log "INFO" "脚本执行完成。"
+log "INFO" "脚本执行完成"
 exit 0
