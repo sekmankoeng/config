@@ -1,24 +1,22 @@
 #!/bin/bash
-set -euo pipefail  # 严格模式：未定义变量报错/管道失败整体报错/非0退出立即终止
+set -euo pipefail  # 严格模式（macOS bash 3.2 兼容）
 
-# ===================== 配置区（可按需调整） =====================
-# 软链接目标目录（家目录）
+# ===================== 配置区 =====================
 LINK_TARGET_DIR="${HOME}"
-# 日志文件路径（自动创建，记录操作明细）
 LOG_FILE="${HOME}/create_symlink_$(date +%Y%m%d%H%M%S).log"
-# 备份后缀（若目标存在真实文件/目录，自动备份）
 BACKUP_SUFFIX=".bak_$(date +%Y%m%d%H%M%S)"
 # ===================== 函数定义区 =====================
 
-# 日志输出函数（同时打印到终端+写入日志）
+# 日志输出函数
 log() {
     local LEVEL="$1"
     local MSG="$2"
-    local TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
-    echo -e "[$TIMESTAMP] [$LEVEL] $MSG" | tee -a "${LOG_FILE}"
+    # local TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+    # echo -e "[$TIMESTAMP] [$LEVEL] $MSG" | tee -a "${LOG_FILE}"
+    echo -e "[$LEVEL] $MSG"
 }
 
-# 校验参数是否为空
+# 校验参数
 check_params() {
     if [ $# -eq 0 ]; then
         log "ERROR" "未传入任何文件参数！用法：$0 <文件1> <文件2> ..."
@@ -26,7 +24,7 @@ check_params() {
     fi
 }
 
-# 校验文件是否存在且为普通文件
+# 校验文件存在且为普通文件
 check_file_exists() {
     local FILE_PATH="$1"
     if [ ! -e "${FILE_PATH}" ]; then
@@ -39,20 +37,33 @@ check_file_exists() {
     return 0
 }
 
+# 跨平台获取文件绝对路径（替换 Linux 的 realpath -e）
+get_abs_path() {
+    local FILE_PATH="$1"
+    # macOS 用 python 替代 realpath（macOS 自带 python3）
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        ABS_PATH=$(python3 -c "import os; print(os.path.realpath('${FILE_PATH}'))" 2>/dev/null)
+    else
+        # Linux 保留 realpath
+        ABS_PATH=$(realpath -e "${FILE_PATH}" 2>/dev/null)
+    fi
+    echo "${ABS_PATH}"
+}
+
 # 创建软链接核心逻辑
 create_symlink() {
-    local SRC_FILE="$1"          # 源文件绝对路径
-    local LINK_NAME="$2"         # 软链接名称（与源文件同名）
-    local LINK_PATH="${LINK_TARGET_DIR}/${LINK_NAME}"  # 软链接完整路径
+    local SRC_FILE="$1"
+    local LINK_NAME="$2"
+    local LINK_PATH="${LINK_TARGET_DIR}/${LINK_NAME}"
 
-    # 1. 若目标是已存在的软链接：强制覆盖
+    # 覆盖已存在的软链接
     if [ -L "${LINK_PATH}" ]; then
         log "INFO" "发现已存在的软链接，强制覆盖：${LINK_PATH}"
         ln -sf "${SRC_FILE}" "${LINK_PATH}"
         return 0
     fi
 
-    # 2. 若目标是真实文件/目录：先备份再创建
+    # 备份真实文件/目录
     if [ -f "${LINK_PATH}" ] || [ -d "${LINK_PATH}" ]; then
         local BACKUP_PATH="${LINK_PATH}${BACKUP_SUFFIX}"
         log "WARNING" "目标是真实文件/目录，先备份：${LINK_PATH} → ${BACKUP_PATH}"
@@ -62,7 +73,7 @@ create_symlink() {
         }
     fi
 
-    # 3. 目标不存在/已备份：创建软链接
+    # 创建软链接
     ln -s "${SRC_FILE}" "${LINK_PATH}" || {
         log "ERROR" "创建软链接失败：${SRC_FILE} → ${LINK_PATH}"
         return 1
@@ -72,34 +83,34 @@ create_symlink() {
 }
 
 # ===================== 主程序 =====================
-# 初始化日志文件
-touch "${LOG_FILE}" && chmod 600 "${LOG_FILE}"  # 仅当前用户可读写
-log "INFO" "脚本启动，日志文件：${LOG_FILE}"
+# 初始化日志（macOS 权限兼容）
+#touch "${LOG_FILE}" && chmod 600 "${LOG_FILE}"
+#log "INFO" "脚本启动，日志文件：${LOG_FILE}"
 
-# 校验输入参数
+# 校验参数
 check_params "$@"
 
-# 遍历所有传入的文件参数
+# 遍历文件参数
 for FILE in "$@"; do
-    # 步骤1：获取文件绝对路径（处理相对路径/当前目录）
-    ABS_SRC_FILE=$(realpath -e "${FILE}" 2>/dev/null)
+    # 跨平台获取绝对路径
+    ABS_SRC_FILE=$(get_abs_path "${FILE}")
     if [ -z "${ABS_SRC_FILE}" ]; then
         log "ERROR" "无法获取绝对路径：${FILE}"
         continue
     fi
 
-    # 步骤2：校验源文件合法性
+    # 校验文件合法性
     if ! check_file_exists "${ABS_SRC_FILE}"; then
         continue
     fi
 
-    # 步骤3：提取文件名（用于软链接命名）
+    # 提取文件名
     FILE_NAME=$(basename "${ABS_SRC_FILE}")
 
-    # 步骤4：创建软链接
+    # 创建软链接
     create_symlink "${ABS_SRC_FILE}" "${FILE_NAME}"
 done
 
-# 脚本结束
-log "INFO" "脚本执行完成，详见日志：${LOG_FILE}"
+#log "INFO" "脚本执行完成，详见日志：${LOG_FILE}"
+log "INFO" "脚本执行完成。"
 exit 0

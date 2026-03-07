@@ -2,12 +2,11 @@
 ## 基础软件包
 ```sh
 # 基础软件
-sudo apt install -y curl git gpg xxd vim ethtool
+sudo apt install -y curl git gpg xxd vim ethtool fontconfig alacritty tmux
 ```
 ## 字体包
 ```sh
-# 安装字体管理工具, 包含fc-list, fc-cache
-sudo apt install -y fontconfig
+# fontconfig安装字体管理工具, 包含fc-list, fc-cache
 # 刷新字体缓存
 fc-cache -fv
 # 查看字体信息
@@ -33,3 +32,9 @@ fc-cache -fv
 ```
 sh ./create_safe_symlink.sh
 ```
+***
+### DMS 安装
+[DankLinux DMS官网](https://danklinux.com/docs/dankmaterialshell/installation)
+
+### yazi 安装
+[debian.griffo.io yazi官网](https://debian.griffo.io/cn/install-latest-yazi-in-debian.html)
