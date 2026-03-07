@@ -1,0 +1,50 @@
+[general]
+import = [
+    # https://github.com/zatchheems/tokyo-night-alacritty-theme.git
+    "~/.config/alacritty/tokyo-night-alacritty-theme/tokyo-night-storm.toml"
+]
+
+[env]
+TERM = "xterm-256color"
+
+[window]
+# window size
+
+# Value range:
+# Fullscreen            启动时直接全屏，无标题栏、无边框，按F11可切换全屏
+# SimpleFullscreen      仅适配macOS下全屏
+# Maximized             启动时*直接最大化*，但保留窗口边框和标题栏
+# Windowed              普通窗口模式;可拖动，可调整大小，有标题栏
+startup_mode = "SimpleFullscreen"
+
+decorations = "None"
+#dimensions = { columns = 135, lines = 30 }
+padding = { x = 4, y = 2 }
+dynamic_padding = true
+
+# transprent
+opacity = 0.90
+
+# window title
+# title = "Alacritty"
+# option as alt(meta)
+option_as_alt = "Both"
+
+[font]
+normal = { family = "JetBrainsMono Nerd Font Mono", style = "Regular" }
+bold = { family = "JetBrainsMono Nerd Font Mono", style = "Bold" }
+italic = { family = "JetBrainsMono Nerd Font Mono", style = "italic" }
+size = 18.0
+
+[terminal]
+#shell = { program = "/bin/zsh", args = [
+#    "-l",
+#    "-c",
+#    "/opt/homebrew/bin/tmux new-session -A -D -s main"
+#    ] }
+
+[terminal.shell]
+args = [ "-l", "-c", "/opt/homebrew/bin/tmux new-session -A -D -s main" ]
+program = "/bin/zsh"
+#args = [ "-l", "-c", "/usr/bin/tmux new-session -A -D -s main" ]
+#program = "/usr/bin/sh"
